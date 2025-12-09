@@ -13,6 +13,9 @@ unzip chr-7.20.6-legacy-bios.img.zip
 # Konversi Image ke Format QCOW2
 qemu-img convert -f raw -O qcow2 chr-7.20.6-legacy-bios.img chr-7.20.6.qcow2
 
+# **Resize QCOW2 menjadi 32GB**
+qemu-img resize chr-7.20.6.qcow2 32G
+
 # Buat Dockerfile
 cat <<EOF > Dockerfile
 FROM ubuntu:22.04
