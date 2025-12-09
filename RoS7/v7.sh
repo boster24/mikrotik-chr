@@ -1,91 +1,43 @@
 #!/bin/bash
-set -e
 
-# ---- Konfigurasi ----
-IMAGE_ZIP_URL="https://github.com/elseif/MikroTikPatch/releases/download/7.20.6/chr-7.20.6-legacy-bios.img.zip"
-RAW_IMG="chr-7.20.6-legacy-bios.img"
-QCOW2="chr-7.20.6.qcow2"
-DOCKER_IMG_NAME="mikrotik-chr-image"
-CONTAINER_NAME="mikrotik-chr"
+# Update dan instal dependensi yang diperlukan
+sudo apt update
+sudo apt install -y wget unzip qemu-utils qemu-user-static
 
-# Update & install deps
-apt update
-apt install -y wget unzip qemu-utils docker.io
+# Download MikroTik CHR Image
+wget https://github.com/elseif/MikroTikPatch/releases/download/7.20.6/chr-7.20.6-legacy-bios.img.zip
 
-# Download CHR zip (skip if already ada)
-if [ ! -f "${RAW_IMG}" ] && [ ! -f "${QCOW2}" ]; then
-  echo "Downloading CHR image..."
-  wget -O chr.zip "${IMAGE_ZIP_URL}"
-  unzip -o chr.zip
-  rm -f chr.zip || true
-fi
+# Ekstrak Image
+unzip chr-7.20.6-legacy-bios.img.zip
 
-# Jika hanya raw image ada, convert ke qcow2
-if [ -f "${RAW_IMG}" ] && [ ! -f "${QCOW2}" ]; then
-  echo "Converting ${RAW_IMG} -> ${QCOW2}..."
-  qemu-img convert -f raw -O qcow2 "${RAW_IMG}" "${QCOW2}"
-fi
+# Konversi Image ke Format QCOW2
+qemu-img convert -f raw -O qcow2 chr-7.20.6-legacy-bios.img chr-7.20.6.qcow2
 
-# Resize (opsional) -- jalankan hanya jika mau resize
-if [ -f "${QCOW2}" ]; then
-  echo "Resizing ${QCOW2} to 32G (will keep if already same size)..."
-  qemu-img resize "${QCOW2}" 32G || true
-fi
+# Resize QCOW2 / total HDD menjadi 32GB
+qemu-img resize chr-7.20.6.qcow2 32G
 
-# Hapus Dockerfile lama jika ada
-rm -f Dockerfile
-
-# Buat Dockerfile yang VALID (CMD satu baris)
-cat > Dockerfile <<'EOF'
+# Buat Dockerfile
+cat <<EOF > Dockerfile
 FROM ubuntu:22.04
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-system-x86
+# Install QEMU user-static for emulation
+RUN apt-get update && apt-get install -y qemu-user-static qemu-system-x86
 
-COPY chr-7.20.6.qcow2 /chr.qcow2
+# Copy the CHR image
+COPY chr-7.20.6.qcow2 /chr-7.20.6.qcow2
 
-EXPOSE 8291
-EXPOSE 80
-EXPOSE 443
-EXPOSE 22
-EXPOSE 23
-EXPOSE 21
-EXPOSE 53/udp
-EXPOSE 53/tcp
-EXPOSE 123/udp
-EXPOSE 8728
-EXPOSE 8729
+# Expose ports
+EXPOSE 8291 80 443 22 23 21 53/udp 53/tcp 123/udp 8728 8729 2210 179 8292 1194/udp 1194/tcp 1701/udp 1723 500/udp 4500/udp 50/tcp 51/tcp 1812/udp 1813/udp
 
-CMD ["qemu-system-x86_64", "-m", "4096M", "-smp", "4", "-hda", "/chr.qcow2", "-serial", "mon:stdio", "-nographic", "-nic", "user,model=e1000,hostfwd=tcp::8291-:8291,hostfwd=tcp::80-:80,hostfwd=tcp::443-:443,hostfwd=tcp::22-:22,hostfwd=tcp::23-:23,hostfwd=tcp::21-:21,hostfwd=udp::53-:53,hostfwd=tcp::53-:53,hostfwd=udp::123-:123,hostfwd=tcp::8728-:8728,hostfwd=tcp::8729-:8729"]
+# Define command to run the MikroTik CHR image
+CMD ["qemu-system-x86_64", "-m", "4096M", "-smp", "4", "-hda", "/chr-7.20.6.qcow2", "-nographic", "-nic", "user,hostfwd=tcp::8291-:8291,hostfwd=tcp::80-:80,hostfwd=tcp::443-:443,hostfwd=tcp::22-:22,hostfwd=tcp::23-:23,hostfwd=tcp::21-:21,hostfwd=udp::53-:53,hostfwd=tcp::53-:53,hostfwd=udp::123-:123,hostfwd=tcp::8728-:8728,hostfwd=tcp::8729-:8729,hostfwd=tcp::2210-:2210,hostfwd=tcp::179-:179,hostfwd=tcp::8292-:8292,hostfwd=udp::1194-:1194,hostfwd=tcp::1194-:1194,hostfwd=udp::1701-:1701,hostfwd=tcp::1723-:1723,hostfwd=udp::500-:500,hostfwd=udp::4500-:4500,hostfwd=tcp::50-:50,hostfwd=tcp::51-:51,hostfwd=udp::1812-:1812,hostfwd=udp::1813-:1813"]
 EOF
 
-# Pastikan file QCOW2 ditempatkan dengan nama yang DI COPY di Dockerfile
-if [ ! -f "${QCOW2}" ]; then
-  echo "ERROR: File ${QCOW2} tidak ditemukan. Pastikan script berhasil mengkonversi atau letakkan file di direktori.
-  Aborting."
-  exit 1
-fi
+# Build Docker Image
+sudo docker build -t mikrotik-chr .
 
-# Rename/copy QCOW2 ke nama yang dipakai Dockerfile agar konsisten
-cp -f "${QCOW2}" ./chr-7.20.6.qcow2
-
-# Convert line endings to unix (hindari CRLF)
-if command -v dos2unix >/dev/null 2>&1; then
-  dos2unix Dockerfile || true
-else
-  apt install -y dos2unix
-  dos2unix Dockerfile || true
-fi
-
-# Build Docker image
-echo "Building Docker image ${DOCKER_IMG_NAME}..."
-docker build -t "${DOCKER_IMG_NAME}" .
-
-# Stop & remove old container if ada
-docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-
-# Run container with restart policy
-echo "Starting container ${CONTAINER_NAME} with restart=always..."
-docker run -d --name "${CONTAINER_NAME}" --restart=always \
+# Jalankan Container MikroTik CHR
+sudo docker run --name mikrotik-chr --restart unless-stopped \
     -p 7000:8291 \
     -p 7001:80 \
     -p 7002:443 \
@@ -97,11 +49,19 @@ docker run -d --name "${CONTAINER_NAME}" --restart=always \
     -p 7008:123/udp \
     -p 7009:8728 \
     -p 7010:8729 \
-    "${DOCKER_IMG_NAME}"
+    -p 7011:2210 \
+    -p 7012:179 \
+    -p 7013:8292 \
+    -p 7014:1194/udp \
+    -p 7015:1194/tcp \
+    -p 7016:1701/udp \
+    -p 7017:1723 \
+    -p 7018:500/udp \
+    -p 7019:4500/udp \
+    -p 7020:50/tcp \
+    -p 7021:51/tcp \
+    -p 7022:1812/udp \
+    -p 7023:1813/udp \
+    mikrotik-chr
 
-echo ""
-echo "=============================="
-echo " MikroTik CHR is RUNNING!"
-echo " Winbox: IP-VPS:7000"
-echo " To watch log: docker logs -f ${CONTAINER_NAME}"
-echo "=============================="
+echo "MikroTik CHR telah berhasil diinstal dan dijalankan dalam Docker dengan nama mikrotik-chr."
