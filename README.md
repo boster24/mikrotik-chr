@@ -18,7 +18,7 @@ docker pull boster24/ros7
 ```
 Menjalankan Image Kedalam Container
 ```
-sudo docker run --name ros7 --restart unless-stopped -p 8291:8291 -p 8728:8728 -p 8729:8729 -p 2222:22 -p 8080:80 -p 443:443 -p 2121:21 boster/ros7:latest
+sudo docker run --name ros7 --restart unless-stopped -p 8291:8291 -p 8728:8728 -p 8729:8729 -p 2222:22 -p 8080:80 -p 443:443 -p 2121:21 boster24/ros7:latest
 ```
 Contoh Menjalankan Image Kedalam Container Dengan Pemetaan Port
 ```
