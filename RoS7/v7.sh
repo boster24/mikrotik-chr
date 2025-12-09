@@ -1,48 +1,55 @@
 #!/bin/bash
 
-# Update dan instal dependensi QEMU
-sudo apt update
-sudo apt install -y wget unzip qemu-utils qemu-user-static
+set -e
 
-# Download MikroTik CHR Image
-wget https://github.com/elseif/MikroTikPatch/releases/download/7.20.6/chr-7.20.6-legacy-bios.img.zip
+# Update & install dependencies
+apt update
+apt install -y wget unzip qemu-utils
 
-# Ekstrak Image
-unzip chr-7.20.6-legacy-bios.img.zip
+# Download CHR Image
+wget -O chr.zip https://github.com/elseif/MikroTikPatch/releases/download/7.20.6/chr-7.20.6-legacy-bios.img.zip
 
-# Konversi Image ke QCOW2
+# Extract
+unzip chr.zip
+rm -f chr.zip
+
+# Convert RAW → QCOW2
 qemu-img convert -f raw -O qcow2 chr-7.20.6-legacy-bios.img chr-7.20.6.qcow2
 
-# Resize QCOW2 menjadi 32GB
+# Resize QCOW2 → 32GB
 qemu-img resize chr-7.20.6.qcow2 32G
 
-# Buat Dockerfile
+# FIX: Create Valid Dockerfile
 cat <<EOF > Dockerfile
 FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y qemu-user-static qemu-system-x86
+RUN apt-get update && apt-get install -y qemu-system-x86
 
-COPY chr-7.20.6.qcow2 /chr-7.20.6.qcow2
+COPY chr-7.20.6.qcow2 /chr.qcow2
 
-EXPOSE 8291 80 443 22 23 21 53/udp 53/tcp 123/udp 8728 8729
+EXPOSE 8291
+EXPOSE 80
+EXPOSE 443
+EXPOSE 22
+EXPOSE 23
+EXPOSE 21
+EXPOSE 53/udp
+EXPOSE 53/tcp
+EXPOSE 123/udp
+EXPOSE 8728
+EXPOSE 8729
 
-CMD ["qemu-system-x86_64",
-     "-m", "4096M",
-     "-smp", "4",
-     "-hda", "/chr-7.20.6.qcow2",
-     "-serial", "mon:stdio",
-     "-nographic",
-     "-nic", "user,model=e1000,hostfwd=tcp::8291-:8291,hostfwd=tcp::80-:80,hostfwd=tcp::443-:443,hostfwd=tcp::22-:22,hostfwd=tcp::23-:23,hostfwd=tcp::21-:21,hostfwd=udp::53-:53,hostfwd=tcp::53-:53,hostfwd=udp::123-:123,hostfwd=tcp::8728-:8728,hostfwd=tcp::8729-:8729"]
+CMD ["qemu-system-x86_64", "-m", "4096M", "-smp", "4", "-hda", "/chr.qcow2", "-serial", "mon:stdio", "-nographic", "-nic", "user,model=e1000,hostfwd=tcp::8291-:8291,hostfwd=tcp::80-:80,hostfwd=tcp::443-:443,hostfwd=tcp::22-:22,hostfwd=tcp::23-:23,hostfwd=tcp::21-:21,hostfwd=udp::53-:53,hostfwd=tcp::53-:53,hostfwd=udp::123-:123,hostfwd=tcp::8728-:8728,hostfwd=tcp::8729-:8729"]
 EOF
 
-# Build Docker Image
-sudo docker build -t mikrotik-chr .
+# Build image
+docker build -t chr-image .
 
-# Hentikan container lama (jika ada)
-sudo docker rm -f mikrotik-chr 2>/dev/null
+# Stop old container
+docker rm -f chr 2>/dev/null || true
 
-# Jalankan container MikroTik CHR (auto-boot + auto-restart)
-sudo docker run -d --name mikrotik-chr --restart unless-stopped \
+# Run with auto-restart
+docker run -d --name chr --restart=always \
     -p 7000:8291 \
     -p 7001:80 \
     -p 7002:443 \
@@ -54,10 +61,10 @@ sudo docker run -d --name mikrotik-chr --restart unless-stopped \
     -p 7008:123/udp \
     -p 7009:8728 \
     -p 7010:8729 \
-    mikrotik-chr
+    chr-image
 
 echo ""
 echo "=============================="
 echo " MikroTik CHR is RUNNING!"
-echo " Access Winbox: IP-VPS:7000"
+echo " Winbox: IP-VPS:7000"
 echo "=============================="
