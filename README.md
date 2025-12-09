@@ -7,7 +7,9 @@
 ```
 bash <(wget -qO- https://raw.githubusercontent.com/boster24/mikrotik-chr/main/RoS7/v7.sh)
 ```
-
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/boster24/mikrotik-chr/main/RoS7/v7.sh)
+```
 # Pull Langsung Dari Repository Docker Hub
 ### RouterOS 7
 Pull
