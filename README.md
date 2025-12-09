@@ -14,11 +14,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/boster24/mikrotik-chr/main/R
 ### RouterOS 7
 Pull
 ```
-docker pull safrinnetwork/ros7
+docker pull boster24/ros7
 ```
 Menjalankan Image Kedalam Container
 ```
-sudo docker run --name ros7 --restart unless-stopped -p 8291:8291 -p 8728:8728 -p 8729:8729 -p 2222:22 -p 8080:80 -p 443:443 -p 2121:21 safrinnetwork/ros7:latest
+sudo docker run --name ros7 --restart unless-stopped -p 8291:8291 -p 8728:8728 -p 8729:8729 -p 2222:22 -p 8080:80 -p 443:443 -p 2121:21 boster/ros7:latest
 ```
 Contoh Menjalankan Image Kedalam Container Dengan Pemetaan Port
 ```
@@ -44,7 +44,7 @@ docker run --name ros7 --restart unless-stopped \
     -p 7018:4500/udp \
     -p 7019:1812/udp \
     -p 7020:1813/udp \
-    safrinnetwork/ros7:latest
+    boster24/ros7:latest
 ```
 
 # Dockerfile
@@ -52,21 +52,14 @@ Jika anda ingin membangun image dengan Dockerfile anda bisa langsung melakukan c
 
 Cloning Repository
 ```
-git clone https://github.com/safrinnetwork/Auto-Install-MikroTik-CHR-on-Docker/
-```
-RouterOS 6
-```
-cd RoS6
-```
-```
-docker build -t safrinnetwork/ros6 .
+git clone https://github.com/boster24/mikrotik-chr/
 ```
 RouterOS 7
 ```
 cd RoS7
 ```
 ```
-docker build -t safrinnetwork/ros7 .
+docker build -t boster24/ros7 .
 ```
 Kemudian anda bisa menjalankan container dengan image yang sudah dibuat dari Dockerfile dengan contoh perintah menjalankan image yang ada di repository ini
 
